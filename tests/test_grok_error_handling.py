@@ -2,6 +2,7 @@ import pytest
 import httpx
 
 from grok_search.providers.grok import GrokSearchProvider
+from grok_search.sources import split_answer_and_sources
 from grok_search.server import _format_grok_error, web_search
 from grok_search.utils import extract_unique_urls, redact_sensitive_text
 
@@ -66,6 +67,39 @@ def test_extract_unique_urls_stops_before_citation_markup():
     assert urls == ["https://www.python.org/"]
 
 
+def test_split_answer_and_sources_extracts_inline_grok_citations():
+    text = "The official Python website is https://www.python.org/.[[1]](https://www.python.org/)"
+
+    answer, sources = split_answer_and_sources(text)
+
+    assert answer == text
+    assert sources == [{"url": "https://www.python.org/"}]
+
+
+def test_grok_payload_uses_x_tool_and_date_parameters():
+    provider = GrokSearchProvider("https://api.example.test/v1", "secret-key", "grok-4.3-high")
+
+    payload = provider._build_search_payload(
+        query="X 上关于 AI 的最新讨论",
+        platform="Twitter",
+        from_date="2026-05-01",
+        to_date="2026-05-18",
+        allowed_domains="x.com, techcrunch.com",
+        max_search_results=3,
+    )
+
+    assert payload["stream"] is True
+    assert payload["tools"] == [{"type": "x_search"}]
+    assert payload["search_parameters"] == {
+        "from_date": "2026-05-01",
+        "to_date": "2026-05-18",
+        "mode": "on",
+    }
+    user_content = payload["messages"][-1]["content"]
+    assert "Only search and cite these domains: x.com, techcrunch.com." in user_content
+    assert "Use no more than 3 high-quality search results" in user_content
+
+
 @pytest.mark.asyncio
 async def test_parse_streaming_response_raises_for_unparseable_empty_content():
     provider = GrokSearchProvider("https://api.example.test/v1", "secret-key", "bad-model")
@@ -87,7 +121,7 @@ async def test_web_search_returns_grok_error_in_content(monkeypatch):
         def __init__(self, api_url, api_key, model):
             pass
 
-        async def search(self, query, platform):
+        async def search(self, query, platform="", **kwargs):
             raise RuntimeError("backend failed with secret-key")
 
     monkeypatch.setenv("GROK_API_URL", "https://api.example.test/v1")

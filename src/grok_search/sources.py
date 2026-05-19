@@ -71,6 +71,8 @@ def split_answer_and_sources(text: str) -> tuple[str, list[dict]]:
     raw = (text or "").strip()
     if not raw:
         return "", []
+    if raw.startswith("Grok 调用失败"):
+        return raw, []
 
     split = _split_function_call_sources(raw)
     if split:
@@ -88,7 +90,7 @@ def split_answer_and_sources(text: str) -> tuple[str, list[dict]]:
     if split:
         return split
 
-    return raw, []
+    return raw, _extract_sources_from_text(raw)
 
 
 def _split_function_call_sources(text: str) -> tuple[str, list[dict]] | None:
@@ -323,6 +325,9 @@ def _extract_sources_from_text(text: str) -> list[dict]:
             continue
         seen.add(url)
         title = (title or "").strip()
+        citation_label = title.strip("[]").strip()
+        if citation_label.isdigit():
+            title = ""
         if title:
             sources.append({"title": title, "url": url})
         else:

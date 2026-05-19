@@ -169,11 +169,15 @@ Executes AI-driven web search via Grok API. By default it returns only Grok's an
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `query` | string | Yes | - | Search query |
-| `platform` | string | No | `""` | Focus platform (e.g., `"Twitter"`, `"GitHub, Reddit"`) |
+| `platform` | string | No | `""` | Focus platform. `"Twitter"`/`"X"` uses the gateway-tested `tools: [{"type":"x_search"}]` path |
 | `model` | string | No | `null` | Per-request Grok model ID |
+| `from_date` | string | No | `""` | Start date (`YYYY-MM-DD`), sent through `search_parameters` and prompt instructions |
+| `to_date` | string | No | `""` | End date (`YYYY-MM-DD`), sent through `search_parameters` and prompt instructions |
+| `allowed_domains` | string | No | `""` | Comma-separated domain constraint. This is prompt-only because gateway tool domain filters are unstable |
+| `max_search_results` | int | No | `0` | Prompt-level result count hint. Gateway tests show it is not reliable as a hard parameter |
 | `extra_sources` | int | No | `0` | Extra sources via Tavily/Firecrawl (0 disables) |
 
-Automatically detects time-related keywords in queries (e.g., "latest", "today", "recent"), injecting local time context to improve accuracy for time-sensitive searches.
+Automatically detects time-related keywords in queries (e.g., "latest", "today", "recent"), injecting local time context to improve accuracy for time-sensitive searches. Third-party Grok gateways may force SSE streaming responses; this project always parses the streaming format and extracts `[[n]](url)` citations into the `get_sources` cache.
 
 Return value (structured dict):
 - `session_id`: search session ID

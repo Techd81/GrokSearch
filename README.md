@@ -167,11 +167,15 @@ claude mcp list
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
 |------|------|------|--------|------|
 | `query` | string | ✅ | - | 搜索查询语句 |
-| `platform` | string | ❌ | `""` | 聚焦平台（如 `"Twitter"`, `"GitHub, Reddit"`） |
+| `platform` | string | ❌ | `""` | 聚焦平台；传 `"Twitter"`/`"X"` 时会使用网关实测更可靠的 `tools: [{"type":"x_search"}]` |
 | `model` | string | ❌ | `null` | 按次指定 Grok 模型 ID |
+| `from_date` | string | ❌ | `""` | 起始日期（`YYYY-MM-DD`），同时写入 `search_parameters` 和 prompt |
+| `to_date` | string | ❌ | `""` | 结束日期（`YYYY-MM-DD`），同时写入 `search_parameters` 和 prompt |
+| `allowed_domains` | string | ❌ | `""` | 逗号分隔域名限制；因网关 tools 域名过滤不稳定，本项目用 prompt 约束 |
+| `max_search_results` | int | ❌ | `0` | prompt 级结果数量建议；网关实测该参数不适合硬控搜索条数 |
 | `extra_sources` | int | ❌ | `0` | 额外补充信源数量（Tavily/Firecrawl，可为 0 关闭） |
 
-自动检测查询中的时间相关关键词（如"最新""今天""recent"等），注入本地时间上下文以提升时效性搜索的准确度。
+自动检测查询中的时间相关关键词（如"最新""今天""recent"等），注入本地时间上下文以提升时效性搜索的准确度。Grok 第三方网关强制返回 SSE 流式响应，本项目始终按流式解析，并会提取 `[[n]](url)` 引用到 `get_sources` 缓存。
 
 返回值（结构化字典）：
 - `session_id`: 本次查询的会话 ID

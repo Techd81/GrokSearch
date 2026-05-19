@@ -155,6 +155,10 @@ async def web_search(
     query: Annotated[str, "Clear, self-contained natural-language search query."],
     platform: Annotated[str, "Target platform to focus on (e.g., 'Twitter', 'GitHub', 'Reddit'). Leave empty for general web search."] = "",
     model: Annotated[str, "Optional model ID for this request only. This value is used ONLY when user explicitly provided."] = "",
+    from_date: Annotated[str, "Optional start date for Grok gateway search in YYYY-MM-DD format. Also injected into the prompt for reliability."] = "",
+    to_date: Annotated[str, "Optional end date for Grok gateway search in YYYY-MM-DD format. Also injected into the prompt for reliability."] = "",
+    allowed_domains: Annotated[str, "Optional comma-separated domains to constrain search by prompt, e.g. 'techcrunch.com,openai.com'."] = "",
+    max_search_results: Annotated[int, Field(description="Optional prompt-level limit for Grok search result count. Gateway support is advisory only.", ge=0, le=20)] = 0,
     extra_sources: Annotated[int, "Number of additional reference results from Tavily/Firecrawl. Set 0 to disable. Default 0."] = 0,
 ) -> dict:
     session_id = new_session_id()
@@ -192,7 +196,14 @@ async def web_search(
     # 并行执行搜索任务
     async def _safe_grok() -> str:
         try:
-            return await grok_provider.search(query, platform)
+            return await grok_provider.search(
+                query=query,
+                platform=platform,
+                from_date=from_date,
+                to_date=to_date,
+                allowed_domains=allowed_domains,
+                max_search_results=max_search_results,
+            )
         except Exception as e:
             error_message = _format_grok_error(e, api_key)
             logger.exception(error_message)
