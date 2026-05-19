@@ -32,6 +32,22 @@ def test_format_grok_http_error_includes_status_and_redacts_secret():
     assert "secret-key" not in message
 
 
+def test_format_grok_http_error_handles_unread_streaming_body():
+    request = httpx.Request("POST", "https://api.example.test/v1/chat/completions")
+    response = httpx.Response(
+        404,
+        stream=httpx.ByteStream(b'{"error":"missing route","api_key":"secret-key"}'),
+        request=request,
+    )
+    exc = httpx.HTTPStatusError("not found", request=request, response=response)
+
+    message = _format_grok_error(exc, api_key="secret-key")
+
+    assert "Grok 调用失败" in message
+    assert "HTTP 404" in message
+    assert "secret-key" not in message
+
+
 def test_redact_sensitive_text_masks_authorization_and_tokens():
     text = "Authorization: Bearer abc123 token=secret-token"
 

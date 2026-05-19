@@ -243,6 +243,8 @@ class GrokSearchProvider(BaseSearchProvider):
                         headers=headers,
                         json=payload,
                     ) as response:
+                        if response.is_error:
+                            await response.aread()
                         response.raise_for_status()
                         return await self._parse_streaming_response(response, ctx)
 

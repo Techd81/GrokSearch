@@ -117,7 +117,11 @@ def _extra_results_to_sources(
 def _format_grok_error(exc: Exception, api_key: str = "") -> str:
     if isinstance(exc, httpx.HTTPStatusError):
         response = exc.response
-        body = redact_sensitive_text(response.text, api_key).strip()
+        try:
+            raw_body = response.text
+        except httpx.ResponseNotRead:
+            raw_body = ""
+        body = redact_sensitive_text(raw_body, api_key).strip()
         if len(body) > 500:
             body = body[:500] + "..."
         detail = f": {body}" if body else ""
