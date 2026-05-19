@@ -2,7 +2,7 @@ from typing import List
 import re
 from .providers.base import SearchResult
 
-_URL_PATTERN = re.compile(r'https?://[^\s<>"\'`，。、；：！？》）】\)]+')
+_URL_PATTERN = re.compile(r'https?://[^\s<>"\'`\[\]\(\)，。、；：！？》）】\)]+')
 
 
 def extract_unique_urls(text: str) -> list[str]:

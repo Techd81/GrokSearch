@@ -3,7 +3,7 @@ import httpx
 
 from grok_search.providers.grok import GrokSearchProvider
 from grok_search.server import _format_grok_error, web_search
-from grok_search.utils import redact_sensitive_text
+from grok_search.utils import extract_unique_urls, redact_sensitive_text
 
 
 class FakeStreamingResponse:
@@ -40,6 +40,14 @@ def test_redact_sensitive_text_masks_authorization_and_tokens():
     assert "abc123" not in redacted
     assert "secret-token" not in redacted
     assert "Bearer ***" in redacted
+
+
+def test_extract_unique_urls_stops_before_citation_markup():
+    text = "The official Python website is https://www.python.org/.[[1]](https://www.python.org/)"
+
+    urls = extract_unique_urls(text)
+
+    assert urls == ["https://www.python.org/"]
 
 
 @pytest.mark.asyncio
