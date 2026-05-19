@@ -13,18 +13,21 @@ from pydantic import Field
 # 尝试使用绝对导入（支持 mcp run）
 try:
     from grok_search.providers.grok import GrokSearchProvider
-    from grok_search.logger import log_info
+    from grok_search.logger import log_info, logger
     from grok_search.config import config
     from grok_search.sources import SourcesCache, merge_sources, new_session_id, split_answer_and_sources
     from grok_search.planning import engine as planning_engine, _split_csv
+    from grok_search.utils import redact_sensitive_text
 except ImportError:
     from .providers.grok import GrokSearchProvider
-    from .logger import log_info
+    from .logger import log_info, logger
     from .config import config
     from .sources import SourcesCache, merge_sources, new_session_id, split_answer_and_sources
     from .planning import engine as planning_engine, _split_csv
+    from .utils import redact_sensitive_text
 
 import asyncio
+import httpx
 
 mcp = FastMCP("grok-search")
 
@@ -111,6 +114,25 @@ def _extra_results_to_sources(
     return sources
 
 
+def _format_grok_error(exc: Exception, api_key: str = "") -> str:
+    if isinstance(exc, httpx.HTTPStatusError):
+        response = exc.response
+        body = redact_sensitive_text(response.text, api_key).strip()
+        if len(body) > 500:
+            body = body[:500] + "..."
+        detail = f": {body}" if body else ""
+        return f"Grok 调用失败: HTTP {response.status_code} {response.reason_phrase}{detail}"
+
+    if isinstance(exc, httpx.RequestError):
+        message = redact_sensitive_text(str(exc), api_key).strip()
+        detail = f": {message}" if message else ""
+        return f"Grok 调用失败: 网络请求失败 ({exc.__class__.__name__}){detail}"
+
+    message = redact_sensitive_text(str(exc), api_key).strip()
+    detail = f": {message}" if message else ""
+    return f"Grok 调用失败: {exc.__class__.__name__}{detail}"
+
+
 @mcp.tool(
     name="web_search",
     output_schema=None,
@@ -167,8 +189,10 @@ async def web_search(
     async def _safe_grok() -> str:
         try:
             return await grok_provider.search(query, platform)
-        except Exception:
-            return ""
+        except Exception as e:
+            error_message = _format_grok_error(e, api_key)
+            logger.exception(error_message)
+            return error_message
 
     async def _safe_tavily() -> list[dict] | None:
         try:

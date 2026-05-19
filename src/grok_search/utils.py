@@ -17,6 +17,24 @@ def extract_unique_urls(text: str) -> list[str]:
     return urls
 
 
+def redact_sensitive_text(text: str, api_key: str = "") -> str:
+    """脱敏错误文本中的密钥、token 和 Authorization 头。"""
+    redacted = str(text or "")
+    if api_key:
+        redacted = redacted.replace(api_key, "***")
+    redacted = re.sub(
+        r"(?i)(authorization\s*[:=]\s*bearer\s+)[^\s,;}]+",
+        r"\1***",
+        redacted,
+    )
+    redacted = re.sub(
+        r"(?i)((?:api[_-]?key|token|secret)\s*[:=]\s*)[^\s,;}]+",
+        r"\1***",
+        redacted,
+    )
+    return redacted
+
+
 def format_extra_sources(tavily_results: list[dict] | None, firecrawl_results: list[dict] | None) -> str:
     sections = []
     idx = 1

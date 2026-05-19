@@ -7,7 +7,7 @@ from tenacity import AsyncRetrying, retry_if_exception, stop_after_attempt, wait
 from tenacity.wait import wait_base
 from zoneinfo import ZoneInfo
 from .base import BaseSearchProvider, SearchResult
-from ..utils import search_prompt, fetch_prompt, url_describe_prompt, rank_sources_prompt
+from ..utils import search_prompt, fetch_prompt, url_describe_prompt, rank_sources_prompt, redact_sensitive_text
 from ..logger import log_info
 from ..config import config
 
@@ -173,7 +173,8 @@ class GrokSearchProvider(BaseSearchProvider):
 
     async def _parse_streaming_response(self, response, ctx=None) -> str:
         content = ""
-        full_body_buffer = [] 
+        full_body_buffer = []
+        parse_errors = 0
         
         async for line in response.aiter_lines():
             line = line.strip()
@@ -196,6 +197,7 @@ class GrokSearchProvider(BaseSearchProvider):
                         if "content" in delta:
                             content += delta["content"]
                 except (json.JSONDecodeError, IndexError):
+                    parse_errors += 1
                     continue
                 
         if not content and full_body_buffer:
@@ -206,7 +208,18 @@ class GrokSearchProvider(BaseSearchProvider):
                     message = data["choices"][0].get("message", {})
                     content = message.get("content", "")
             except json.JSONDecodeError:
-                pass
+                parse_errors += 1
+
+        if not content:
+            if full_body_buffer:
+                snippet = redact_sensitive_text("\n".join(full_body_buffer[:5]), self.api_key).strip()
+                if len(snippet) > 500:
+                    snippet = snippet[:500] + "..."
+                raise ValueError(
+                    "Grok stream parse error: no content found in streaming response"
+                    f" (parse_errors={parse_errors}, snippet={snippet})"
+                )
+            raise ValueError("Grok stream parse error: empty streaming response")
         
         await log_info(ctx, f"content: {content}", config.debug_enabled)
 
