@@ -97,6 +97,10 @@ def _normalize_multi_agent_model(model: str) -> tuple[str, str]:
     return normalized, ""
 
 
+def _is_official_xai_api_url(api_url: str) -> bool:
+    return "api.x.ai" in (api_url or "").lower()
+
+
 def _valid_reasoning_effort(effort: str) -> str:
     normalized = (effort or "").strip().lower()
     return normalized if normalized in {"low", "medium", "high", "xhigh"} else ""
@@ -159,7 +163,8 @@ class GrokSearchProvider(BaseSearchProvider):
     ):
         super().__init__(api_url, api_key)
         self.model = model
-        self.responses_model, model_effort = _normalize_multi_agent_model(model)
+        normalized_model, model_effort = _normalize_multi_agent_model(model)
+        self.responses_model = normalized_model if _is_official_xai_api_url(api_url) else model
         self.reasoning_effort = _valid_reasoning_effort(reasoning_effort) or model_effort
 
     def get_provider_name(self) -> str:
@@ -322,7 +327,7 @@ class GrokSearchProvider(BaseSearchProvider):
             try:
                 return await self._execute_responses_stream_with_retry(headers, payload, ctx)
             except httpx.HTTPStatusError as exc:
-                if exc.response.status_code not in {404, 405}:
+                if not self._should_fallback_from_responses_api(exc):
                     raise
                 await log_info(ctx, "responses_api_unavailable: falling back to chat/completions", config.debug_enabled)
                 payload = self._build_search_payload(
@@ -476,6 +481,20 @@ class GrokSearchProvider(BaseSearchProvider):
             return content
         footer = "\n".join(f"[[{idx}]]({url})" for idx, url in enumerate(unique, start=1))
         return f"{content.rstrip()}\n\nSources:\n{footer}"
+
+    def _should_fallback_from_responses_api(self, exc: httpx.HTTPStatusError) -> bool:
+        status = exc.response.status_code
+        if status in {404, 405}:
+            return True
+        if _is_official_xai_api_url(self.api_url):
+            return False
+        if status not in {400, 503}:
+            return False
+        try:
+            body = exc.response.text
+        except httpx.ResponseNotRead:
+            body = ""
+        return "model_not_found" in body or "无可用渠道" in body
 
     async def _parse_responses_streaming_response(self, response, ctx=None) -> str:
         content = ""

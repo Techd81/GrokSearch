@@ -102,7 +102,7 @@ def test_grok_payload_uses_x_tool_and_date_parameters():
 
 def test_multi_agent_payload_uses_responses_api_shape_and_reasoning_effort():
     provider = GrokSearchProvider(
-        "https://api.example.test/v1",
+        "https://api.x.ai/v1",
         "secret-key",
         "grok-4.20-multi-agent-xhigh",
     )
@@ -129,6 +129,32 @@ def test_multi_agent_payload_uses_responses_api_shape_and_reasoning_effort():
     assert "input" in payload
     assert "messages" not in payload
     assert "search_parameters" not in payload
+
+
+def test_multi_agent_gateway_payload_preserves_gateway_model_alias():
+    provider = GrokSearchProvider(
+        "https://api.example.test/v1",
+        "secret-key",
+        "grok-4.20-multi-agent-xhigh",
+    )
+
+    payload = provider._build_responses_search_payload(query="Reply OK")
+
+    assert payload["model"] == "grok-4.20-multi-agent-xhigh"
+    assert payload["reasoning"] == {"effort": "xhigh"}
+
+
+def test_multi_agent_gateway_model_not_found_can_fallback_to_chat():
+    request = httpx.Request("POST", "https://api.example.test/v1/responses")
+    response = httpx.Response(
+        503,
+        text='{"error":{"code":"model_not_found","message":"无可用渠道"}}',
+        request=request,
+    )
+    exc = httpx.HTTPStatusError("unavailable", request=request, response=response)
+    provider = GrokSearchProvider("https://api.example.test/v1", "secret-key", "grok-4.20-multi-agent-xhigh")
+
+    assert provider._should_fallback_from_responses_api(exc) is True
 
 
 @pytest.mark.asyncio
