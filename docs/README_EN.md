@@ -126,6 +126,7 @@ You can also configure additional environment variables in the `env` field:
 | `GROK_API_URL` | No | `{GUDA_BASE_URL}/grok/v1` | Grok API endpoint (OpenAI-compatible), overrides GuDa-derived value |
 | `GROK_API_KEY` | No | `{GUDA_API_KEY}` | Grok API key, overrides GuDa-derived value |
 | `GROK_MODEL` | No | `grok-4.20-beta` | Default model (takes precedence over `~/.config/grok-search/config.json` when set) |
+| `GROK_REASONING_EFFORT` | No | - | Responses API reasoning effort for `grok-4.20-multi-agent`: `low`/`medium` uses 4 agents, `high`/`xhigh` uses 16 agents |
 | `TAVILY_API_KEY` | No | `{GUDA_API_KEY}` | Tavily API key (for web_fetch / web_map) |
 | `TAVILY_API_URL` | No | `{GUDA_BASE_URL}/tavily` | Tavily API endpoint |
 | `TAVILY_ENABLED` | No | `true` | Enable Tavily |
@@ -176,8 +177,11 @@ Executes AI-driven web search via Grok API. By default it returns only Grok's an
 | `allowed_domains` | string | No | `""` | Comma-separated domain constraint. This is prompt-only because gateway tool domain filters are unstable |
 | `max_search_results` | int | No | `0` | Prompt-level result count hint. Gateway tests show it is not reliable as a hard parameter |
 | `extra_sources` | int | No | `0` | Extra sources via Tavily/Firecrawl (0 disables) |
+| `reasoning_effort` | string | No | `""` | Only for `grok-4.20-multi-agent` models. Overrides `GROK_REASONING_EFFORT`; valid values are `low`/`medium`/`high`/`xhigh` |
 
 Automatically detects time-related keywords in queries (e.g., "latest", "today", "recent"), injecting local time context to improve accuracy for time-sensitive searches. Third-party Grok gateways may force SSE streaming responses; this project always parses the streaming format and extracts `[[n]](url)` citations into the `get_sources` cache.
+
+For `grok-4.20-multi-agent` model IDs, this tool first uses xAI's official `/responses` endpoint, enables the built-in `web_search` tool, enables `x_search` as well when `platform="Twitter"`/`"X"`, and maps `*-high`/`*-xhigh` model suffixes to `reasoning.effort`. If a third-party gateway does not expose `/responses` and returns 404/405, the tool falls back to the existing `/chat/completions` path.
 
 Return value (structured dict):
 - `session_id`: search session ID

@@ -100,6 +100,53 @@ def test_grok_payload_uses_x_tool_and_date_parameters():
     assert "Use no more than 3 high-quality search results" in user_content
 
 
+def test_multi_agent_payload_uses_responses_api_shape_and_reasoning_effort():
+    provider = GrokSearchProvider(
+        "https://api.example.test/v1",
+        "secret-key",
+        "grok-4.20-multi-agent-xhigh",
+    )
+
+    payload = provider._build_responses_search_payload(
+        query="Research xAI release notes",
+        platform="Twitter",
+        allowed_domains="x.ai, docs.x.ai, x.com, example.com, openai.com, extra.test",
+        max_search_results=5,
+    )
+
+    assert payload["model"] == "grok-4.20-multi-agent"
+    assert payload["stream"] is True
+    assert payload["reasoning"] == {"effort": "xhigh"}
+    assert payload["tools"] == [
+        {
+            "type": "web_search",
+            "filters": {
+                "allowed_domains": ["x.ai", "docs.x.ai", "x.com", "example.com", "openai.com"],
+            },
+        },
+        {"type": "x_search"},
+    ]
+    assert "input" in payload
+    assert "messages" not in payload
+    assert "search_parameters" not in payload
+
+
+@pytest.mark.asyncio
+async def test_parse_responses_streaming_response_extracts_delta_and_citations():
+    provider = GrokSearchProvider("https://api.example.test/v1", "secret-key", "grok-4.20-multi-agent")
+    response = FakeStreamingResponse([
+        'data: {"type":"response.output_text.delta","delta":"Final answer."}',
+        'data: {"type":"response.completed","response":{"citations":["https://x.ai/news"],"output":[]}}',
+        "data: [DONE]",
+    ])
+
+    content = await provider._parse_responses_streaming_response(response)
+
+    assert "Final answer." in content
+    assert "Sources:" in content
+    assert "[[1]](https://x.ai/news)" in content
+
+
 @pytest.mark.asyncio
 async def test_parse_streaming_response_raises_for_unparseable_empty_content():
     provider = GrokSearchProvider("https://api.example.test/v1", "secret-key", "bad-model")

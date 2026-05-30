@@ -126,6 +126,7 @@ claude mcp add-json grok-search --scope user '{
 | `GROK_API_URL` | ✅ | - | Grok API 地址（OpenAI 兼容格式） |
 | `GROK_API_KEY` | ✅ | - | Grok API 密钥 |
 | `GROK_MODEL` | ❌ | `grok-4-fast` | 默认模型（设置后优先于 `~/.config/grok-search/config.json`） |
+| `GROK_REASONING_EFFORT` | ❌ | - | `grok-4.20-multi-agent` 的 Responses API 推理强度：`low`/`medium` 为 4 agents，`high`/`xhigh` 为 16 agents |
 | `TAVILY_API_KEY` | ❌ | - | Tavily API 密钥（用于 web_fetch / web_map） |
 | `TAVILY_API_URL` | ❌ | `https://api.tavily.com` | Tavily API 地址 |
 | `TAVILY_ENABLED` | ❌ | `true` | 是否启用 Tavily |
@@ -174,8 +175,11 @@ claude mcp list
 | `allowed_domains` | string | ❌ | `""` | 逗号分隔域名限制；因网关 tools 域名过滤不稳定，本项目用 prompt 约束 |
 | `max_search_results` | int | ❌ | `0` | prompt 级结果数量建议；网关实测该参数不适合硬控搜索条数 |
 | `extra_sources` | int | ❌ | `0` | 额外补充信源数量（Tavily/Firecrawl，可为 0 关闭） |
+| `reasoning_effort` | string | ❌ | `""` | 仅用于 `grok-4.20-multi-agent` 系列；覆盖 `GROK_REASONING_EFFORT`，可选 `low`/`medium`/`high`/`xhigh` |
 
 自动检测查询中的时间相关关键词（如"最新""今天""recent"等），注入本地时间上下文以提升时效性搜索的准确度。Grok 第三方网关强制返回 SSE 流式响应，本项目始终按流式解析，并会提取 `[[n]](url)` 引用到 `get_sources` 缓存。
+
+当模型名属于 `grok-4.20-multi-agent` 系列时，本工具会优先使用 xAI 官方要求的 `/responses` 接口，自动启用内置 `web_search`，在 `platform="Twitter"`/`"X"` 时同时启用 `x_search`，并把 `*-high`/`*-xhigh` 模型后缀映射为 `reasoning.effort`。如果第三方网关缺少 `/responses` 路由并返回 404/405，则回退到原 `/chat/completions` 路径。
 
 返回值（结构化字典）：
 - `session_id`: 本次查询的会话 ID

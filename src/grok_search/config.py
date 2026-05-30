@@ -64,6 +64,10 @@ class Config:
         return int(os.getenv("GROK_RETRY_MAX_WAIT", "10"))
 
     @property
+    def grok_reasoning_effort(self) -> str:
+        return os.getenv("GROK_REASONING_EFFORT", "").strip().lower()
+
+    @property
     def grok_api_url(self) -> str:
         url = os.getenv("GROK_API_URL")
         if not url:
@@ -183,6 +187,7 @@ class Config:
             "GROK_API_URL": api_url,
             "GROK_API_KEY": api_key_masked,
             "GROK_MODEL": self.grok_model,
+            "GROK_REASONING_EFFORT": self.grok_reasoning_effort or "未配置",
             "GROK_DEBUG": self.debug_enabled,
             "GROK_LOG_LEVEL": self.log_level,
             "GROK_LOG_DIR": str(self.log_dir),

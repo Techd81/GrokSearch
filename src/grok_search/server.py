@@ -160,6 +160,7 @@ async def web_search(
     allowed_domains: Annotated[str, "Optional comma-separated domains to constrain search by prompt, e.g. 'techcrunch.com,openai.com'."] = "",
     max_search_results: Annotated[int, Field(description="Optional prompt-level limit for Grok search result count. Gateway support is advisory only.", ge=0, le=20)] = 0,
     extra_sources: Annotated[int, "Number of additional reference results from Tavily/Firecrawl. Set 0 to disable. Default 0."] = 0,
+    reasoning_effort: Annotated[str, "Optional Responses API reasoning.effort for grok-4.20-multi-agent models: low/medium uses 4 agents, high/xhigh uses 16 agents."] = "",
 ) -> dict:
     session_id = new_session_id()
     try:
@@ -170,6 +171,14 @@ async def web_search(
         return {"session_id": session_id, "content": f"配置错误: {str(e)}", "sources_count": 0}
 
     effective_model = config.grok_model
+    effective_reasoning_effort = (reasoning_effort or config.grok_reasoning_effort).strip().lower()
+    if effective_reasoning_effort and effective_reasoning_effort not in {"low", "medium", "high", "xhigh"}:
+        await _SOURCES_CACHE.set(session_id, [])
+        return {
+            "session_id": session_id,
+            "content": "无效 reasoning_effort: 仅支持 low, medium, high, xhigh",
+            "sources_count": 0,
+        }
     if model:
         available = await _get_available_models_cached(api_url, api_key)
         if available and model not in available:
@@ -203,6 +212,7 @@ async def web_search(
                 to_date=to_date,
                 allowed_domains=allowed_domains,
                 max_search_results=max_search_results,
+                reasoning_effort=effective_reasoning_effort,
             )
         except Exception as e:
             error_message = _format_grok_error(e, api_key)
